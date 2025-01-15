@@ -4,53 +4,54 @@
 #include <thread>
 #include <chrono>
 
-LPVOID ntOpenFile = GetProcAddress(LoadLibraryW(L"ntdll"), "NtOpenFile"); // https://github.com/v3ctra/load-lib-injector
-
-
-void bypass(HANDLE hProcess) // https://github.com/v3ctra/load-lib-injector
+DWORD GetProcessByName(const char* lpProcessName)
 {
-    // Restore original NtOpenFile from external process
-    //credits: Daniel Krupiñski(pozdro dla ciebie byczku <3)
-    if (ntOpenFile) {
-        char originalBytes[5];
-        memcpy(originalBytes, ntOpenFile, 5);
-        WriteProcessMemory(hProcess, ntOpenFile, originalBytes, 5, NULL);
-        printf("bypass\n");
+    char lpCurrentProcessName[255];
 
-    }
-}
+    PROCESSENTRY32 ProcList{};
+    ProcList.dwSize = sizeof(ProcList);
 
-void Backup(HANDLE hProcess) // https://github.com/v3ctra/load-lib-injector
-{
-    if (ntOpenFile) {
-        //So, when I patching first 5 bytes I need to backup them to 0? (I think)
-        char originalBytes[5];
-        memcpy(originalBytes, ntOpenFile, 5);
-        WriteProcessMemory(hProcess, ntOpenFile, originalBytes, 0, NULL);
-        printf("backup!\n");
+    const HANDLE hProcList = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    if (hProcList == INVALID_HANDLE_VALUE)
+        return -1;
+
+    if (!Process32First(hProcList, &ProcList))
+        return -1;
+
+    wcstombs_s(nullptr, lpCurrentProcessName, ProcList.szExeFile, 255);
+
+    if (lstrcmpA(lpCurrentProcessName, lpProcessName) == 0)
+        return ProcList.th32ProcessID;
+
+    while (Process32Next(hProcList, &ProcList))
+    {
+        wcstombs_s(nullptr, lpCurrentProcessName, ProcList.szExeFile, 255);
+
+        if (lstrcmpA(lpCurrentProcessName, lpProcessName) == 0)
+            return ProcList.th32ProcessID;
     }
+
+    return -1;
 }
 // dll injector by https://github.com/adamhlt/DLL-Injector
 int main(const int argc, char* argv[])
 {
     const char* lpDLLName = "skeet.dll";
+    const char* lpProcessName = "csgo.exe";
     char lpFullDLLPath[MAX_PATH];
-    SetConsoleTitleA("Skeet inj version without -insecure");
-    printf("open csgo and make sure that you have skeet.dll in folder with injector\n");
-    printf("Waiting for csgo window :)\n");
-    HWND window = FindWindowA("Valve001", nullptr);
+    printf("Waiting for process: %s\n", lpProcessName);
+
     DWORD dwProcessID = (DWORD)-1;
-    while (window == nullptr) 
+
+    while (dwProcessID == (DWORD)-1)
     {
-        window = FindWindowA("Valve001", nullptr); 
-        if (window != nullptr)
+        dwProcessID = GetProcessByName(lpProcessName);
+        if (dwProcessID == (DWORD)-1)
         {
-            GetWindowThreadProcessId(window, &dwProcessID);
-            printf("found window. process id: %lu\n", dwProcessID);
-            break;
+            std::this_thread::sleep_for(std::chrono::seconds(1));
         }
-        std::this_thread::sleep_for(std::chrono::seconds(1)); 
     }
+
     printf("Process found!\n");
     printf("Process ID: %i\n\n", (int)dwProcessID);
 
@@ -70,16 +71,20 @@ int main(const int argc, char* argv[])
 
     printf("[PROCESS INJECTION]\n");
     printf("Process opened successfully.\n");
-    bypass(hTargetProcess);
+
     VirtualAllocEx(hTargetProcess, (LPVOID)0x43310000, 0x2FC000u, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE); // for skeet
     VirtualAllocEx(hTargetProcess, 0, 0x1000u, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE); // for skeet
 
-    LPVOID allocatedMem = VirtualAllocEx(hTargetProcess, NULL, lstrlenA(lpFullDLLPath) + 1, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+    const LPVOID lpPathAddress = VirtualAllocEx(hTargetProcess, nullptr, lstrlenA(lpFullDLLPath) + 1, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+    if (lpPathAddress == nullptr)
+    {
+        printf("An error occurred when trying to allocate memory in the target process.\n");
+        return -1;
+    }
 
+    printf("Memory allocated at 0x%X\n", (UINT)(uintptr_t)lpPathAddress);
 
-    printf("Memory allocated at 0x%X\n", (UINT)(uintptr_t)allocatedMem);
-
-    const DWORD dwWriteResult = WriteProcessMemory(hTargetProcess, allocatedMem, lpFullDLLPath, lstrlenA(lpFullDLLPath) + 1, NULL);
+    const DWORD dwWriteResult = WriteProcessMemory(hTargetProcess, lpPathAddress, lpFullDLLPath, lstrlenA(lpFullDLLPath) + 1, nullptr);
     if (dwWriteResult == 0)
     {
         printf("An error occurred when trying to write the DLL path in the target process.\n");
@@ -101,15 +106,14 @@ int main(const int argc, char* argv[])
 
     printf("LoadLibraryA address at 0x%X\n", (UINT)(uintptr_t)lpFunctionAddress);
 
-    const HANDLE hThreadCreationResult = CreateRemoteThread(hTargetProcess, nullptr, 0, (LPTHREAD_START_ROUTINE)lpFunctionAddress, allocatedMem, 0, nullptr);
+    const HANDLE hThreadCreationResult = CreateRemoteThread(hTargetProcess, nullptr, 0, (LPTHREAD_START_ROUTINE)lpFunctionAddress, lpPathAddress, 0, nullptr);
     if (hThreadCreationResult == INVALID_HANDLE_VALUE)
     {
         printf("An error occurred when trying to create the thread in the target process.\n");
         return -1;
     }
-    CloseHandle(hTargetProcess);
+
     printf("DLL Injected!\n");
-    Backup(hTargetProcess);
-    Sleep(2000);
+
     return 0;
 }
