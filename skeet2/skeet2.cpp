@@ -1,8 +1,46 @@
-#include <Windows.h>
-#include <TlHelp32.h>
 #include <iostream>
+#include <string>
 #include <thread>
 #include <chrono>
+#include <Windows.h>
+#include <TlHelp32.h>
+#include "game_starter.h"
+
+int startGame()
+{
+    std::string steamPath = findSteamPath();
+    // my csgo arguments personally, modify them to suit your own
+    // -steam argument is required for the game to start properly
+    const char* gameArgs = "-steam -insecure -novid -d3d9ex -console -freq 144"
+                            "-high +rate 128000 +cl_cmdrate 128 +cl_updaterate 128"
+                            " -tickrate 128 +ex_interpratio 1 +cl_interp 0.01"
+                            " -noforcemspd -noforcemaccel -noforcemparms -threads 6 -nojoy";
+
+    if (steamPath.empty()) {
+        printf("failed to find steam\n");
+        return -1;
+    } else {
+        printf("steam found");
+    }
+    
+    std::string csgoPath = findGamePath(steamPath, "Counter-Strike Global Offensive");
+
+    if (csgoPath.empty()) {
+        printf("CS:GO not found\n");
+        return -1;
+    } else {
+        printf("CSGO found");
+    }
+    
+    std::string fullGamePath = csgoPath + "\\csgo.exe";
+    const char* gamePath = fullGamePath.c_str();
+    HINSTANCE result = ShellExecuteA(NULL, "open", gamePath, gameArgs, NULL, SW_SHOWNORMAL);
+    
+    if ((int)result <= 32) {
+        MessageBoxA(NULL, "failed to start CS:GO directly.", "Game Start Error", MB_ICONERROR);
+        return -1;
+    }
+}
 
 DWORD GetProcessByName(const char* lpProcessName)
 {
@@ -41,8 +79,9 @@ int main(const int argc, char* argv[])
     char lpFullDLLPath[MAX_PATH];
     printf("Waiting for process: %s\n", lpProcessName);
 
-    DWORD dwProcessID = (DWORD)-1;
+    startGame();
 
+    DWORD dwProcessID = (DWORD)-1;
     while (dwProcessID == (DWORD)-1)
     {
         dwProcessID = GetProcessByName(lpProcessName);
