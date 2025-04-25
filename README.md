@@ -14,7 +14,8 @@ This is a regular loadlibrary injector that allocates csgo.exe memory in a certa
 VAC support, -insecure dont needed.
 Compile in release x86, launch injector with admin rights
 
-- Original YouGame QHide skeet cr2ack thread: https://yougame.biz/threads/338779/
-- Original YouGame thread: https://yougame.biz/threads/339007/
-- Source of LoadLibrary injector from: https://github.com/adamhlt/DLL-Injector
-- Source of loadlibrary inj method for vac from: https://github.com/v3ctra/load-lib-injector
+> [!IMPORTANT]  
+> - Original YouGame QHide skeet cr2ack thread: https://yougame.biz/threads/338779/
+> - Original YouGame thread: https://yougame.biz/threads/339007/
+> - Source of LoadLibrary injector from: https://github.com/adamhlt/DLL-Injector
+> - Source of loadlibrary inj method for vac from: https://github.com/v3ctra/load-lib-injector
