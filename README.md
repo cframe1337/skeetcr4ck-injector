@@ -11,7 +11,7 @@ This is a regular loadlibrary injector that allocates csgo.exe memory in a certa
 > [!WARNING]  
 > Need to be skeet.dll in folder with injector.
 
-VAC support, -insecure dont needed.
+VAC bypass, -insecure dont needed.
 Compile in release x86, launch injector with admin rights
 
 > [!IMPORTANT]  
