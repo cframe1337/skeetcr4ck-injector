@@ -8,6 +8,42 @@
 
 LPVOID ntOpenFile = GetProcAddress(LoadLibraryW(L"ntdll"), "NtOpenFile"); // https://github.com/v3ctra/load-lib-injector
 
+int startGame()
+{
+    std::string steamPath = findSteamPath();
+    // my csgo arguments personally, modify them to suit your own
+    // -steam argument is required for the game to start properly
+    const char* gameArgs = "-steam -novid -d3d9ex -console -freq 144"
+                            "-high +rate 128000 +cl_cmdrate 128 +cl_updaterate 128"
+                            " -tickrate 128 +ex_interpratio 1 +cl_interp 0.01"
+                            " -noforcemspd -noforcemaccel -noforcemparms -threads 6 -nojoy";
+
+    if (steamPath.empty()) {
+        printf("failed to find steam\n");
+        return -1;
+    } else {
+        printf("steam found");
+    }
+    
+    std::string csgoPath = findGamePath(steamPath, "Counter-Strike Global Offensive");
+
+    if (csgoPath.empty()) {
+        printf("CS:GO not found\n");
+        return -1;
+    } else {
+        printf("CSGO found");
+    }
+    
+    std::string fullGamePath = csgoPath + "\\csgo.exe";
+    const char* gamePath = fullGamePath.c_str();
+    HINSTANCE result = ShellExecuteA(NULL, "open", gamePath, gameArgs, NULL, SW_SHOWNORMAL);
+    
+    if ((int)result <= 32) {
+        MessageBoxA(NULL, "failed to start CS:GO directly.", "Game Start Error", MB_ICONERROR);
+        return -1;
+    }
+}
+
 void bypass(HANDLE hProcess) // https://github.com/v3ctra/load-lib-injector
 {
     // Restore original NtOpenFile from external process
@@ -31,48 +67,18 @@ void Backup(HANDLE hProcess) // https://github.com/v3ctra/load-lib-injector
         printf("backup!\n");
     }
 }
+
 // dll injector by https://github.com/adamhlt/DLL-Injector
 int main(const int argc, char* argv[])
 {
     const char* lpDLLName = "skeet.dll";
-    std::string steamPath = findSteamPath();
-    
-    // my csgo arguments personally, modify them to suit your own
-    // -steam argument is required for the game to start properly
-    const char* gameArgs = "-steam -novid -d3d9ex -console -freq 144"
-                            "-high +rate 128000 +cl_cmdrate 128 +cl_updaterate 128"
-                            " -tickrate 128 +ex_interpratio 1 +cl_interp 0.01"
-                            " -noforcemspd -noforcemaccel -noforcemparms -threads 6 -nojoy";
     char lpFullDLLPath[MAX_PATH];
     
     SetConsoleTitleA("Skeet inj version without -insecure");
     printf("make sure that you started steam and have skeet.dll in folder with injector\n");
     printf("Waiting for csgo window :)\n");
 
-    if (steamPath.empty()) {
-        printf("failed to find steam\n");
-        return -1;
-    } else {
-        printf("steam found: %s", steamPath);
-    }
-    
-    std::string csgoPath = findGamePath(steamPath, "Counter-Strike Global Offensive");
-
-    if (csgoPath.empty()) {
-        printf("CS:GO not found\n");
-        return -1;
-    } else {
-        printf("CSGO found");
-    }
-    
-    std::string fullGamePath = csgoPath + "\\csgo.exe";
-    const char* gamePath = fullGamePath.c_str();
-    HINSTANCE result = ShellExecuteA(NULL, "open", gamePath, gameArgs, NULL, SW_SHOWNORMAL);
-    
-    if ((int)result <= 32) {
-        MessageBoxA(NULL, "failed to start CS:GO directly.", "Game Start Error", MB_ICONERROR);
-        return -1;
-    }
+    startGame(); // auto start game
     
     HWND window = FindWindowA("Valve001", nullptr);
     DWORD dwProcessID = (DWORD)-1;
