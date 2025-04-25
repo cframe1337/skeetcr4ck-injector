@@ -12,9 +12,7 @@
 
 LPVOID ntOpenFile = GetProcAddress(LoadLibraryW(L"ntdll"), "NtOpenFile"); // https://github.com/v3ctra/load-lib-injector
 
-const char* stringToConstChar(const std::string& str) {
-    return str.c_str();
-}
+const char* stringToConstChar(const std::string& str) { return str.c_str(); }
 
 std::vector<std::string> getAvailableDrives() {
     std::vector<std::string> drives;
@@ -24,9 +22,7 @@ std::vector<std::string> getAvailableDrives() {
     if (length > 0 && length <= sizeof(buffer)) {
         char* drive = buffer;
         while (*drive) {
-            if (GetDriveTypeA(drive) == DRIVE_FIXED) {
-                drives.push_back(drive);
-            }
+            if (GetDriveTypeA(drive) == DRIVE_FIXED) { drives.push_back(drive); }
             drive += strlen(drive) + 1;
         }
     }
@@ -64,7 +60,6 @@ std::vector<std::string> findDirectories(const std::string& path) {
 
 std::string findSteamPath() {
     std::vector<std::string> drives = getAvailableDrives();
-
     for (const auto& drive : drives) {
         std::vector<std::string> commonLocations = {
             drive + "Program Files (x86)\\Steam",
@@ -73,9 +68,7 @@ std::string findSteamPath() {
         };
 
         for (const auto& path : commonLocations) {
-            if (directoryExists(path) && fileExists(path + "\\steam.exe")) {
-                return path;
-            }
+            if (directoryExists(path) && fileExists(path + "\\steam.exe")) { return path; }
         }
     }
 
@@ -83,15 +76,11 @@ std::string findSteamPath() {
         std::vector<std::string> rootDirs = findDirectories(drive);
 
         for (const auto& dir : rootDirs) {
-            if (fileExists(dir + "\\steam.exe")) {
-                return dir;
-            }
-
+            if (fileExists(dir + "\\steam.exe")) { return dir; }
+            
             std::string dirName = dir.substr(dir.find_last_of('\\') + 1);
-            if (dirName == "Steam" && fileExists(dir + "\\steam.exe")) {
-                return dir;
-            }
-
+            
+            if (dirName == "Steam" && fileExists(dir + "\\steam.exe")) { return dir; }
             if (dirName == "Program Files" || dirName == "Program Files (x86)") {
                 std::vector<std::string> subDirs = findDirectories(dir);
                 for (const auto& subDir : subDirs) {
@@ -109,13 +98,7 @@ std::string findSteamPath() {
 
 std::string findGamePath(const std::string& steamPath, const std::string& gameFolder) {
     std::string commonPath = steamPath + "\\steamapps\\common\\" + gameFolder;
-
-    printf("current common path: %s\n", commonPath);
-
-    if (directoryExists(commonPath)) {
-        return commonPath;
-    }
-
+    if (directoryExists(commonPath)) { return commonPath; }
     return ""; // return nothing if not found
 }
 
@@ -157,12 +140,12 @@ int main(const int argc, char* argv[])
     char lpFullDLLPath[MAX_PATH];
     
     SetConsoleTitleA("Skeet inj version without -insecure");
-    printf("make sure that you have skeet.dll in folder with injector\n");
+    printf("make sure that you started steam and have skeet.dll in folder with injector\n");
     printf("Waiting for csgo window :)\n");
 
     if (steamPath.empty()) {
         printf("failed to find steam\n");
-        return 1;
+        return -1;
     } else {
         printf("steam found: %s", steamPath);
     }
@@ -171,7 +154,7 @@ int main(const int argc, char* argv[])
 
     if (csgoPath.empty()) {
         printf("CS:GO not found\n");
-        return 1;
+        return -1;
     } else {
         printf("CSGO found");
     }
@@ -181,7 +164,7 @@ int main(const int argc, char* argv[])
     HINSTANCE result = ShellExecuteA(NULL, "open", gamePath, gameArgs, NULL, SW_SHOWNORMAL);
     if ((int)result <= 32) {
         MessageBoxA(NULL, "failed to start CS:GO directly.", "Game Start Error", MB_ICONERROR);
-        return 1;
+        return -1;
     }
     
     HWND window = FindWindowA("Valve001", nullptr);
