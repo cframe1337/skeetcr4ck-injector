@@ -1,5 +1,6 @@
 /* --------------------------------------------------------------------------- */
-/*	Used this utility https://github.com/Arty3/SteamPathFinder			       */
+/*	Used this utility https://github.com/Arty3/SteamPathFinder
+	It uses GPLv3 (GNU General Public License Version 3)*/
 /* --------------------------------------------------------------------------- */
 
 #pragma once
