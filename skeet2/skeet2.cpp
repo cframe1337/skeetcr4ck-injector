@@ -2,7 +2,6 @@
 #include <thread>
 #include <chrono>
 #include <string>
-#include <cstring>
 #include <cstdio>
 #include <optional>
 
@@ -11,12 +10,17 @@
 
 #include "path_finder.hpp"
 
-static int autoStart()
+static int autoStart(const std::string& additionalArgs = "")
 {
     const char* lpGameName = "Counter-Strike Global Offensive";
     const char* lpGameArgs = "-steam -insecure";
     const char* lpProcessName  = "csgo.exe";
     AllowGamePathCaching = false;
+
+    std::string fullArgs = lpGameArgs;
+    if (!additionalArgs.empty()) {
+        fullArgs += " " + additionalArgs;
+    }
     
     auto gamePath = GetSteamGamePath(lpGameName, lpProcessName);
     if (!gamePath) {
@@ -25,7 +29,7 @@ static int autoStart()
     }
 
     std::string exePath = (gamePath.value() / lpProcessName).string();
-    HINSTANCE result = ShellExecuteA(NULL, "open", exePath.c_str(), lpGameArgs, NULL, SW_SHOWNORMAL);
+    HINSTANCE result = ShellExecuteA(NULL, "open", exePath.c_str(), fullArgs.c_str(), NULL, SW_SHOWNORMAL);
 
     if ((INT_PTR)result <= 32) {
         printf("Failed to start game. Error code: %ld\n", (long)result);
@@ -67,12 +71,18 @@ int main(const int argc, char* argv[])
     const char* lpProcessName = "csgo.exe";
     char lpFullDLLPath[MAX_PATH];
 
+    std::string additionalArgs; // Added the ability to accept additional arguments for game
+    for (int i = 1; i < argc; ++i) {
+        if (i > 1) additionalArgs += " ";
+        additionalArgs += argv[i];
+    }
+
     printf("Waiting for process: %s\n", lpProcessName);
 
-    DWORD dwProcessID = GetProcessByName(lpProcessName);
+    DWORD dwProcessID = GetProcessByName(lpProcessName); // Small changes in game process finding 
     if (dwProcessID == (DWORD)-1) {
         printf("Game not running, trying auto start...\n");
-        autoStart();
+        autoStart(additionalArgs);
         do {
             std::this_thread::sleep_for(std::chrono::seconds(1));
             dwProcessID = GetProcessByName(lpProcessName);
