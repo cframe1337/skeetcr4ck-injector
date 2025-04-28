@@ -1,65 +1,53 @@
 #include <iostream>
-#include <string>
 #include <thread>
 #include <chrono>
+#include <string>
+#include <cstring>
+#include <cstdio>
+#include <optional>
+
 #include <Windows.h>
 #include <TlHelp32.h>
-#include "game_starter.h"
 
-int startGame()
+#include "path_finder.hpp"
+
+static int autoStart()
 {
-    std::string steamPath = findSteamPath();
-    // my csgo arguments personally, modify them to suit your own
-    // -steam argument is required for the game to start properly
-    const char* gameArgs = "-steam -insecure -novid -d3d9ex -console -freq 144"
-                            "-high +rate 128000 +cl_cmdrate 128 +cl_updaterate 128"
-                            " -tickrate 128 +ex_interpratio 1 +cl_interp 0.01"
-                            " -noforcemspd -noforcemaccel -noforcemparms -threads 6 -nojoy";
+    const char* lpGameName = "Counter-Strike Global Offensive";
+    const char* lpGameArgs = "-steam -insecure";
+    const char* lpProcessName  = "csgo.exe";
+    AllowGamePathCaching = false;
+    
+    auto gamePath = GetSteamGamePath(lpGameName, lpProcessName);
+    if (!gamePath) {
+        printf("Game '%s' not found.\n", lpGameName);
+        return -1;
+    }
 
-    if (steamPath.empty()) {
-        printf("failed to find steam\n");
-        return -1;
-    } else {
-        printf("steam found");
-    }
-    
-    std::string csgoPath = findGamePath(steamPath, "Counter-Strike Global Offensive");
+    std::string exePath = (gamePath.value() / lpProcessName).string();
+    HINSTANCE result = ShellExecuteA(NULL, "open", exePath.c_str(), lpGameArgs, NULL, SW_SHOWNORMAL);
 
-    if (csgoPath.empty()) {
-        printf("CS:GO not found\n");
-        return -1;
-    } else {
-        printf("CSGO found");
-    }
-    
-    std::string fullGamePath = csgoPath + "\\csgo.exe";
-    const char* gamePath = fullGamePath.c_str();
-    HINSTANCE result = ShellExecuteA(NULL, "open", gamePath, gameArgs, NULL, SW_SHOWNORMAL);
-    
-    if ((int)result <= 32) {
-        MessageBoxA(NULL, "failed to start CS:GO directly.", "Game Start Error", MB_ICONERROR);
+    if ((INT_PTR)result <= 32) {
+        printf("Failed to start game. Error code: %ld\n", (long)result);
         return -1;
     }
+
+    return 0;
 }
 
-DWORD GetProcessByName(const char* lpProcessName)
+
+static DWORD GetProcessByName(const char* lpProcessName)
 {
     char lpCurrentProcessName[255];
-
     PROCESSENTRY32 ProcList{};
     ProcList.dwSize = sizeof(ProcList);
-
     const HANDLE hProcList = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-    if (hProcList == INVALID_HANDLE_VALUE)
-        return -1;
 
-    if (!Process32First(hProcList, &ProcList))
-        return -1;
+    if (hProcList == INVALID_HANDLE_VALUE) return -1;
+    if (!Process32First(hProcList, &ProcList)) return -1;
 
     wcstombs_s(nullptr, lpCurrentProcessName, ProcList.szExeFile, 255);
-
-    if (lstrcmpA(lpCurrentProcessName, lpProcessName) == 0)
-        return ProcList.th32ProcessID;
+    if (lstrcmpA(lpCurrentProcessName, lpProcessName) == 0) return ProcList.th32ProcessID;
 
     while (Process32Next(hProcList, &ProcList))
     {
@@ -71,28 +59,27 @@ DWORD GetProcessByName(const char* lpProcessName)
 
     return -1;
 }
+
 // dll injector by https://github.com/adamhlt/DLL-Injector
 int main(const int argc, char* argv[])
 {
     const char* lpDLLName = "skeet.dll";
     const char* lpProcessName = "csgo.exe";
     char lpFullDLLPath[MAX_PATH];
+
     printf("Waiting for process: %s\n", lpProcessName);
 
-    startGame();
-
-    DWORD dwProcessID = (DWORD)-1;
-    while (dwProcessID == (DWORD)-1)
-    {
-        dwProcessID = GetProcessByName(lpProcessName);
-        if (dwProcessID == (DWORD)-1)
-        {
+    DWORD dwProcessID = GetProcessByName(lpProcessName);
+    if (dwProcessID == (DWORD)-1) {
+        printf("Game not running, trying auto start...\n");
+        autoStart();
+        do {
             std::this_thread::sleep_for(std::chrono::seconds(1));
-        }
+            dwProcessID = GetProcessByName(lpProcessName);
+        } while (dwProcessID == (DWORD)-1);
     }
 
-    printf("Process found!\n");
-    printf("Process ID: %i\n\n", (int)dwProcessID);
+    printf("Process found!\nProcess ID: %i\n\n", (int)dwProcessID);
 
     const DWORD dwFullPathResult = GetFullPathNameA(lpDLLName, MAX_PATH, lpFullDLLPath, nullptr);
     if (dwFullPathResult == 0)
@@ -108,7 +95,7 @@ int main(const int argc, char* argv[])
         return -1;
     }
 
-    printf("[PROCESS INJECTION]\n");
+    printf("Process injection...\n");
     printf("Process opened successfully.\n");
 
     VirtualAllocEx(hTargetProcess, (LPVOID)0x43310000, 0x2FC000u, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE); // for skeet
